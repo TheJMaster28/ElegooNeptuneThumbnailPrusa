@@ -1,3 +1,10 @@
+# Copyright (c) 2023 TheJMaster28
+# Copyright (c) 2023 Molodos
+# Copyright (c) 2023 sigathi
+# Copyright (c) 2020 DhanOS
+# The ElegooNeptuneThumbnailPrusa plugin is released under the terms of the AGPLv3 or higher.
+
+
 import argparse
 import base64
 import logging
@@ -11,42 +18,51 @@ from os import path
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage
 
-# Get the directory of the Python script
 script_dir = path.dirname(path.abspath(__file__))
-
-# Specify the log file path
 log_file = path.join(script_dir, "app.log")
-
-logging.basicConfig(
-    level=logging.DEBUG, filename=log_file, filemode="w", format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.DEBUG, filename=log_file, filemode="w", format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("my_logger")
 
 
 class Neptune_Thumbnail:
     def __init__(self, slicer_output):
         self.slicer_output = slicer_output
+        logger.info(f"gcode input file from slicer: {args.input_file}")
 
     def find_thumbnail(self):
-        size = 600
+        """
+        Finds thumbnail encoding generated from PrusaSlicer in the gcode file
+        """
         thumbnail_str = ""
         with open(self.slicer_output, "r") as file:
             found_thumbnail = False
-            while not found_thumbnail:
-                file_line = file.readline()
-                if "; thumbnail begin" in file_line:
-                    found_thumbnail = True
-            found_end_thumbnail = False
-            while not found_end_thumbnail:
-                file_line = file.readline()
-                if "; thumbnail end" in file_line:
-                    found_end_thumbnail = True
-                    break
-                clean_line = file_line.replace("; ", "")
-                thumbnail_str += clean_line.strip()
+            try:
+                while not found_thumbnail:
+                    file_line = file.readline()
+                    if "; thumbnail begin" in file_line:
+                        logger.debug(f"found thumbnail begin at file line: {file.tell()}")
+                        found_thumbnail = True
+                found_end_thumbnail = False
+                while not found_end_thumbnail:
+                    file_line = file.readline()
+                    if "; thumbnail end" in file_line:
+                        logger.debug(f"found thumbnail end at file line: {file.tell()}")
+                        found_end_thumbnail = True
+                        break
+                    clean_line = file_line.replace("; ", "")
+                    thumbnail_str += clean_line.strip()
+            except StopIteration:
+                logger.error("End of file reached. Could not find thumbnail encoding in provided gcode file.")
+                exit(0)
         return thumbnail_str
 
     def decode(self, text) -> QImage:
+        """
+        Decodes thumbnail string into a QImage object
+        """
+        if text == "":
+            logger.error("thumbnail text is empty")
+        logger.debug("Decoding thumbnail from base64")
         text_bytes = text.encode("ascii")
         decode_data = base64.b64decode(text_bytes)
         image_stream = BytesIO(decode_data)
@@ -111,15 +127,17 @@ class Neptune_Thumbnail:
             for j in range(appendlen):
                 result += "0"
 
-        except Exception as e:
-            logger.error(traceback.format_exc())
+        except Exception:
+            logger.exception("Failed to prase new thumbnail screenshot")
 
         return result + "\r"
 
     def run(self):
+        """
+        Main runner for executable
+        """
         prusa_thumbnail_str = self.find_thumbnail()
         prusa_thumbnail_decoded = self.decode(prusa_thumbnail_str)
-        prusa_thumbnail_decoded.save("test.png")
         new_thumbnail_gcode = ""
         new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 200, 200, ";gimage:")
         new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 160, 160, ";simage:")
@@ -140,20 +158,11 @@ if __name__ == "__main__":
             "input_file",
             metavar="gcode-files",
             type=str,
-            help="One or more GCode file(s) to be processed " "- at least one is required.",
+            help="GCode file to be processed.",
         )
 
         args = parser.parse_args()
-
-        logger.info(f" temp gcode output: {args.input_file}")
         obj = Neptune_Thumbnail(args.input_file)
         obj.run()
     except Exception:
-        logger.error(traceback.format_exc())
-        exit(1)
-
-# test_file = (
-#     r"D:\Documents\3D Printer Models\G code test\xyzCalibration_cube_0.2mm_PLA_NEPTUNE3PRO_45m.gcode"
-# )
-# obj = Neptune_Thumbnail(test_file)
-# obj.run()
+        logger.exception("Error occurred while running application.")
