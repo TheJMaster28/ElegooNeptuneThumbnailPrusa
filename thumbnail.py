@@ -9,7 +9,6 @@ import argparse
 import base64
 import logging
 import platform
-import traceback
 from array import array
 from ctypes import *
 from io import BytesIO
@@ -34,27 +33,22 @@ class Neptune_Thumbnail:
         Finds thumbnail encoding generated from PrusaSlicer in the gcode file
         """
         thumbnail_str = ""
+        found_thumbnail = False
+        file_line = 1
         with open(self.slicer_output, "r") as file:
-            found_thumbnail = False
-            try:
-                while not found_thumbnail:
-                    file_line = file.readline()
-                    if "; thumbnail begin" in file_line:
-                        logger.debug(f"found thumbnail begin at file line: {file.tell()}")
-                        found_thumbnail = True
-                found_end_thumbnail = False
-                while not found_end_thumbnail:
-                    file_line = file.readline()
-                    if "; thumbnail end" in file_line:
-                        logger.debug(f"found thumbnail end at file line: {file.tell()}")
-                        found_end_thumbnail = True
-                        break
-                    clean_line = file_line.replace("; ", "")
+            for line in file:
+                if "; thumbnail begin" in line:
+                    logger.debug(f"found thumbnail begin at file line: {file_line}")
+                    found_thumbnail = True
+                elif "; thumbnail end" in line:
+                    logger.debug(f"found thumbnail end at file line: {file_line}")
+                    return thumbnail_str
+                elif found_thumbnail:
+                    clean_line = line.replace("; ", "")
                     thumbnail_str += clean_line.strip()
-            except StopIteration:
-                logger.error("End of file reached. Could not find thumbnail encoding in provided gcode file.")
-                exit(0)
-        return thumbnail_str
+                file_line += 1
+
+            logger.error("End of file reached. Could not find thumbnail encoding in provided gcode file.")
 
     def decode(self, text) -> QImage:
         """
@@ -75,15 +69,20 @@ class Neptune_Thumbnail:
         """
         system = platform.system()
         if system == "Darwin":
-            p_dll = CDLL(path.join(path.dirname(__file__), "libColPic.dylib"))
+            dll_path = path.join(path.dirname(__file__), "libColPic.dylib")
+            p_dll = CDLL(dll_path)
+            logger.debug(f"using {system} dll: {dll_path}")
         elif system == "Linux":
-            p_dll = CDLL(path.join(path.dirname(__file__), "libColPic.so"))
+            dll_path = path.join(path.dirname(__file__), "libColPic.so")
+            p_dll = CDLL(dll_path)
+            logger.debug(f"using {system} dll: {dll_path}")
         else:
-            p_dll = CDLL(path.join(path.dirname(__file__), "ColPic_X64.dll"))
+            dll_path = path.join(path.dirname(__file__), "ColPic_X64.dll")
+            p_dll = CDLL(dll_path)
+            logger.debug(f"using {system} dll: {dll_path}")
 
         result = ""
         b_image = img.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
-        b_image.save("test_1.png")
         img_size = b_image.size()
         color16 = array("H")
         try:
@@ -141,6 +140,7 @@ class Neptune_Thumbnail:
         new_thumbnail_gcode = ""
         new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 200, 200, ";gimage:")
         new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 160, 160, ";simage:")
+        logger.debug("Parsed new thumbnail screenshot gcode.")
 
         with open(self.slicer_output, "r") as file:
             file_content = file.read()
@@ -149,6 +149,7 @@ class Neptune_Thumbnail:
 
         with open(self.slicer_output, "w") as file:
             file.write(file_content_new)
+        logger.info(f"Wrote new thumbnail screenshot in gcode file: {self.slicer_output}")
 
 
 if __name__ == "__main__":
