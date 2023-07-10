@@ -32,5 +32,5 @@ I would also believe that this package should also work on older version of Prus
 
 ## Contribution
 
-This repository is based on [Molodos/ElegooNeptuneThumbnails](https://github.com/Molodos/ElegooNeptuneThumbnails) and therefore
+This repository is based on [Molodos/ElegooNeptuneThumbnails](https://github.com/Molodos/ElegooNeptuneThumbnails) and [sigathi/ElegooN3Thumbnail](https://github.com/sigathi/ElegooN3Thumbnail), therefore
 released under the **AGPL v3** license.
