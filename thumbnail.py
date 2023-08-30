@@ -38,12 +38,13 @@ class Neptune_Thumbnail:
         file_line = 1
         with open(self.slicer_output, "r") as file:
             for line in file:
-                if "; thumbnail begin" in line:
+                if "; thumbnail begin 200x200" in line:
                     logger.debug(f"found thumbnail begin at file line: {file_line}")
                     found_thumbnail = True
-                elif "; thumbnail end" in line:
-                    logger.debug(f"found thumbnail end at file line: {file_line}")
-                    return thumbnail_str
+                elif "; thumbnail end" in line and found_thumbnail:
+                    if found_thumbnail:
+                        logger.debug(f"found thumbnail end at file line: {file_line}")
+                        return thumbnail_str
                 elif found_thumbnail:
                     clean_line = line.replace("; ", "")
                     thumbnail_str += clean_line.strip()
@@ -183,7 +184,7 @@ class Neptune_Thumbnail:
             new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 200, 200, ";gimage:")
             new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 160, 160, ";simage:")
 
-        new_thumbnail_gcode += "\r"
+        new_thumbnail_gcode += "\r\r"
 
         logger.debug("Parsed new thumbnail screenshot gcode.")
 
@@ -208,9 +209,9 @@ if __name__ == "__main__":
         )
         parser.add_argument(
             "--old_printer",
-            type=bool,
             help="Run for older Neptune Printers",
             default=False,
+            action="store_true",
         )
 
         args = parser.parse_args()
