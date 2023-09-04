@@ -24,10 +24,15 @@ logger = logging.getLogger("my_logger")
 
 
 class Neptune_Thumbnail:
-    def __init__(self, slicer_output, old_printer=False):
+    def __init__(self, slicer_output, old_printer=False, img_size="300x300"):
         self.slicer_output = slicer_output
         self.run_old_printer = old_printer
+        self.img_size = img_size
         logger.info(f"gcode input file from slicer: {args.input_file}")
+        if self.run_old_printer:
+            logger.info("Using Older printer settings")
+        if self.img_size != "200x200":
+            logger.info(f"Not using default img size. Will find a thumbnail with size of {img_size}")
 
     def find_thumbnail(self):
         """
@@ -38,7 +43,7 @@ class Neptune_Thumbnail:
         file_line = 1
         with open(self.slicer_output, "r") as file:
             for line in file:
-                if "; thumbnail begin 200x200" in line:
+                if f"; thumbnail begin {self.img_size}" in line:
                     logger.debug(f"found thumbnail begin at file line: {file_line}")
                     found_thumbnail = True
                 elif "; thumbnail end" in line and found_thumbnail:
@@ -213,9 +218,14 @@ if __name__ == "__main__":
             default=False,
             action="store_true",
         )
+        parser.add_argument(
+            "--img_size",
+            default="200x200",
+            help="Size of image to find in Gcode to encode",
+        )
 
         args = parser.parse_args()
-        obj = Neptune_Thumbnail(args.input_file, old_printer=args.old_printer)
+        obj = Neptune_Thumbnail(args.input_file, old_printer=args.old_printer, img_size=args.img_size)
         obj.run()
     except Exception as ex:
         logger.exception("Error occurred while running application.")
