@@ -31,6 +31,7 @@ If you do not want to run the exe, you can also run the script through Python. C
 `"C:\Program Files\Python311\python.exe" "C:\ElegooNeptuneThumbnailPrusa\thumbnail.py";`
 
 ## Compatibility
+
 Tested with PrusaSlicer 2.6.0 and 2.6.1
 
 Works on 3 Series Printers (Pro, Plus, and Max) 
