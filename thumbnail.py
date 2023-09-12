@@ -24,9 +24,15 @@ logger = logging.getLogger("my_logger")
 
 
 class Neptune_Thumbnail:
-    def __init__(self, slicer_output):
+    def __init__(self, slicer_output, old_printer=False, img_size="300x300"):
         self.slicer_output = slicer_output
+        self.run_old_printer = old_printer
+        self.img_size = img_size
         logger.info(f"gcode input file from slicer: {args.input_file}")
+        if self.run_old_printer:
+            logger.info("Using Older printer settings")
+        if self.img_size != "200x200":
+            logger.info(f"Not using default img size. Will find a thumbnail with size of {img_size}")
 
     def find_thumbnail(self):
         """
@@ -37,12 +43,13 @@ class Neptune_Thumbnail:
         file_line = 1
         with open(self.slicer_output, "r") as file:
             for line in file:
-                if "; thumbnail begin" in line:
+                if f"; thumbnail begin {self.img_size}" in line:
                     logger.debug(f"found thumbnail begin at file line: {file_line}")
                     found_thumbnail = True
-                elif "; thumbnail end" in line:
-                    logger.debug(f"found thumbnail end at file line: {file_line}")
-                    return thumbnail_str
+                elif "; thumbnail end" in line and found_thumbnail:
+                    if found_thumbnail:
+                        logger.debug(f"found thumbnail end at file line: {file_line}")
+                        return thumbnail_str
                 elif found_thumbnail:
                     clean_line = line.replace("; ", "")
                     thumbnail_str += clean_line.strip()
@@ -61,7 +68,44 @@ class Neptune_Thumbnail:
         decode_data = base64.b64decode(text_bytes)
         image_stream = BytesIO(decode_data)
         qimage: QImage = QImage.fromData(image_stream.getvalue())
+        qimage.save("test.png")
         return qimage
+
+    def parse_screenshot(cls, img, width, height, img_type) -> str:
+        """
+        Parse screenshot to string for old printers
+        """
+        result = ""
+        b_image = img.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+        img_size = b_image.size()
+        result += img_type
+        datasize = 0
+        for i in range(img_size.height()):
+            for j in range(img_size.width()):
+                pixel_color = b_image.pixelColor(j, i)
+                r = pixel_color.red() >> 3
+                g = pixel_color.green() >> 2
+                b = pixel_color.blue() >> 3
+                rgb = (r << 11) | (g << 5) | b
+                str_hex = "%x" % rgb
+                if len(str_hex) == 3:
+                    str_hex = "0" + str_hex[0:3]
+                elif len(str_hex) == 2:
+                    str_hex = "00" + str_hex[0:2]
+                elif len(str_hex) == 1:
+                    str_hex = "000" + str_hex[0:1]
+                if str_hex[2:4] != "":
+                    result += str_hex[2:4]
+                    datasize += 2
+                if str_hex[0:2] != "":
+                    result += str_hex[0:2]
+                    datasize += 2
+                if datasize >= 50:
+                    datasize = 0
+            result += "\rM10086 ;"
+            if i == img_size.height() - 1:
+                result += "\r"
+        return result
 
     def parse_screenshot_new(cls, img, width, height, img_type) -> str:
         """
@@ -138,8 +182,15 @@ class Neptune_Thumbnail:
         prusa_thumbnail_str = self.find_thumbnail()
         prusa_thumbnail_decoded = self.decode(prusa_thumbnail_str)
         new_thumbnail_gcode = ""
-        new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 200, 200, ";gimage:")
-        new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 160, 160, ";simage:")
+        if self.run_old_printer:
+            new_thumbnail_gcode += self.parse_screenshot(prusa_thumbnail_decoded, 200, 200, ";gimage:")
+            new_thumbnail_gcode += self.parse_screenshot(prusa_thumbnail_decoded, 160, 160, ";simage:")
+        else:
+            new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 200, 200, ";gimage:")
+            new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 160, 160, ";simage:")
+
+        new_thumbnail_gcode += "\r\r"
+
         logger.debug("Parsed new thumbnail screenshot gcode.")
 
         with open(self.slicer_output, "r") as file:
@@ -161,9 +212,20 @@ if __name__ == "__main__":
             type=str,
             help="GCode file to be processed.",
         )
+        parser.add_argument(
+            "--old_printer",
+            help="Run for older Neptune Printers",
+            default=False,
+            action="store_true",
+        )
+        parser.add_argument(
+            "--img_size",
+            default="200x200",
+            help="Size of image to find in Gcode to encode",
+        )
 
         args = parser.parse_args()
-        obj = Neptune_Thumbnail(args.input_file)
+        obj = Neptune_Thumbnail(args.input_file, old_printer=args.old_printer, img_size=args.img_size)
         obj.run()
-    except Exception:
+    except Exception as ex:
         logger.exception("Error occurred while running application.")
