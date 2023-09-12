@@ -32,9 +32,9 @@ If you do not want to run the exe, you can also run the script through Python. C
 
 ## Compatibility
 
-So far I have only tested on my printer, the 3 Pro, and with PrusaSlicer 2.6.0.
+Tested with PrusaSlicer 2.6.0 and 2.6.1
 
-I would believe that this package should work with the Plus and the Max. 
+Works on 3 Series Printers (Pro, Plus, and Max) 
 
 Older Printers (Neptune 2 series and X) are now supported with the `--old_printer` argument! 
 
