@@ -68,7 +68,7 @@ class Neptune_Thumbnail:
         decode_data = base64.b64decode(text_bytes)
         image_stream = BytesIO(decode_data)
         qimage: QImage = QImage.fromData(image_stream.getvalue())
-        qimage.save("test.png")
+        # qimage.save("test.png")
         return qimage
 
     def parse_screenshot(cls, img, width, height, img_type) -> str:
