@@ -13,18 +13,20 @@ from array import array
 from ctypes import *
 from io import BytesIO
 from os import path
+import sys
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage
 
-script_dir = path.dirname(path.abspath(__file__))
+
+script_dir = path.dirname(sys.argv[0])
 log_file = path.join(script_dir, "app.log")
 logging.basicConfig(level=logging.DEBUG, filename=log_file, filemode="w", format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("my_logger")
 
 
 class Neptune_Thumbnail:
-    def __init__(self, slicer_output, old_printer=False, img_size="300x300"):
+    def __init__(self, slicer_output, old_printer=False, img_size="200x200"):
         self.slicer_output = slicer_output
         self.run_old_printer = old_printer
         self.img_size = img_size
