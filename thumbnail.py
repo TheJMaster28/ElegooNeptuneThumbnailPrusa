@@ -47,7 +47,6 @@ class Neptune_Thumbnail:
     def find_print_time(self):
         with open(self.slicer_output, "r") as file:
             for index, line in enumerate(file):
-                # ; estimated printing time (normal mode) = 1d 20h 29m 57s
                 if "; estimated printing time (normal mode) =" in line:
                     time = line.split("=")
                     return time[1].strip()
@@ -55,7 +54,6 @@ class Neptune_Thumbnail:
     def find_filament_used(self):
         with open(self.slicer_output, "r") as file:
             for index, line in enumerate(file):
-                # ; estimated printing time (normal mode) = 1d 20h 29m 57s
                 if "; total filament used [g] =" in line:
                     used = line.split("=")
                     return used[1].strip()
@@ -79,14 +77,14 @@ class Neptune_Thumbnail:
                     clean_line = line.replace("; ", "")
                     thumbnail_str += clean_line.strip()
 
-            logger.error("End of file reached. Could not find thumbnail encoding in provided gcode file.")
+            raise Exception(f"End of file reached. Could not find thumbnail {self.img_size} encoding in provided gcode file.")
 
     def decode(self, text) -> QImage:
         """
         Decodes thumbnail string into a QImage object
         """
-        if text == "":
-            logger.error("thumbnail text is empty")
+        if text:
+            raise Exception("thumbnail text is empty")
         logger.debug("Decoding thumbnail from base64")
         text_bytes = text.encode("ascii")
         decode_data = base64.b64decode(text_bytes)
