@@ -77,7 +77,7 @@ class Neptune_Thumbnail:
                     clean_line = line.replace("; ", "")
                     thumbnail_str += clean_line.strip()
 
-            raise Exception(f"End of file reached. Could not find thumbnail {self.img_size} encoding in provided gcode file.")
+            raise Exception(f"End of file reached. Could not find thumbnail {self.img_size} encoding in provided gcode file: {self.slicer_output}")
 
     def decode(self, text) -> QImage:
         """
