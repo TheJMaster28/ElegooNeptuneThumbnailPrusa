@@ -9,14 +9,16 @@ import argparse
 import base64
 import logging
 import platform
+import re
+import sys
 from array import array
 from ctypes import *
+from datetime import timedelta
 from io import BytesIO
 from os import path
-import sys
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QImage
+from PyQt6.QtGui import QColor, QFont, QGuiApplication, QImage, QPainter
 
 
 script_dir = path.dirname(sys.argv[0])
@@ -25,16 +27,36 @@ logging.basicConfig(level=logging.DEBUG, filename=log_file, filemode="w", format
 logger = logging.getLogger("my_logger")
 
 
+app = QGuiApplication(sys.argv)
+
+
 class Neptune_Thumbnail:
     def __init__(self, slicer_output, old_printer=False, img_size="200x200"):
         self.slicer_output = slicer_output
         self.run_old_printer = old_printer
         self.img_size = img_size
+        _ = img_size.split("x")
+        self.img_x = int(_[0])
+        self.img_y = int(_[1])
         logger.info(f"gcode input file from slicer: {args.input_file}")
         if self.run_old_printer:
             logger.info("Using Older printer settings")
         if self.img_size != "200x200":
             logger.info(f"Not using default img size. Will find a thumbnail with size of {img_size}")
+
+    def find_print_time(self):
+        with open(self.slicer_output, "r") as file:
+            for index, line in enumerate(file):
+                if "; estimated printing time (normal mode) =" in line:
+                    time = line.split("=")
+                    return time[1].strip()
+
+    def find_filament_used(self):
+        with open(self.slicer_output, "r") as file:
+            for index, line in enumerate(file):
+                if "; total filament used [g] =" in line:
+                    used = line.split("=")
+                    return used[1].strip()
 
     def find_thumbnail(self):
         """
@@ -42,38 +64,55 @@ class Neptune_Thumbnail:
         """
         thumbnail_str = ""
         found_thumbnail = False
-        file_line = 1
         with open(self.slicer_output, "r") as file:
-            for line in file:
+            for index, line in enumerate(file):
                 if f"; thumbnail begin {self.img_size}" in line:
-                    logger.debug(f"found thumbnail begin at file line: {file_line}")
+                    logger.debug(f"found thumbnail begin at file line: {index}")
                     found_thumbnail = True
                 elif "; thumbnail end" in line and found_thumbnail:
                     if found_thumbnail:
-                        logger.debug(f"found thumbnail end at file line: {file_line}")
+                        logger.debug(f"found thumbnail end at file line: {index}")
                         return thumbnail_str
                 elif found_thumbnail:
                     clean_line = line.replace("; ", "")
                     thumbnail_str += clean_line.strip()
-                file_line += 1
 
-            logger.error("End of file reached. Could not find thumbnail encoding in provided gcode file.")
+            raise Exception(f"End of file reached. Could not find thumbnail {self.img_size} encoding in provided gcode file.")
 
     def decode(self, text) -> QImage:
         """
         Decodes thumbnail string into a QImage object
         """
-        if text == "":
-            logger.error("thumbnail text is empty")
+        if text:
+            raise Exception("thumbnail text is empty")
         logger.debug("Decoding thumbnail from base64")
         text_bytes = text.encode("ascii")
         decode_data = base64.b64decode(text_bytes)
         image_stream = BytesIO(decode_data)
         qimage: QImage = QImage.fromData(image_stream.getvalue())
-        # qimage.save("test.png")
+        self.time_str = self.find_print_time()
+        self.filament_str = self.find_filament_used() + "g"
+        # Write to image
+        logger.debug("Writing text to image")
+        # time
+        painter = QPainter()
+        painter.begin(qimage)
+        font = QFont("Arial", 20)
+        painter.setFont(font)
+        painter.setPen(QColor(Qt.GlobalColor.white))
+        x_point = int(self.img_y * 0.02)
+        y_point = int(self.img_y * 0.12)
+        # time
+        painter.drawText(x_point, y_point, self.time_str)
+        # filament
+        painter.drawText(x_point, self.img_y - y_point + 26, self.filament_str)
+
+        painter.end()
+        # qimage.save(path.join(script_dir, "test.png"))
+
         return qimage
 
-    def parse_screenshot(cls, img, width, height, img_type) -> str:
+    def parse_screenshot(self, img: QImage, width, height, img_type) -> str:
         """
         Parse screenshot to string for old printers
         """
@@ -109,7 +148,7 @@ class Neptune_Thumbnail:
                 result += "\r"
         return result
 
-    def parse_screenshot_new(cls, img, width, height, img_type) -> str:
+    def parse_screenshot_new(self, img: QImage, width, height, img_type) -> str:
         """
         Parse screenshot to string for new printers
         """
@@ -192,6 +231,9 @@ class Neptune_Thumbnail:
             new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 160, 160, ";simage:")
 
         new_thumbnail_gcode += "\r\r"
+        new_thumbnail_gcode += "; Thumbnail Generated by ElegooNeptuneThumbnailPrusa\r\r"
+        # seeing if this works for N4 printer thanks to Molodos: https://github.com/Molodos/ElegooNeptuneThumbnails-Prusa
+        new_thumbnail_gcode += f"; Cura-SteamEnigine X.X to trick printer into thinking this is Cura\r\r"
 
         logger.debug("Parsed new thumbnail screenshot gcode.")
 
