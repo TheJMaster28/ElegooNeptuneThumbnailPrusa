@@ -83,7 +83,7 @@ class Neptune_Thumbnail:
         """
         Decodes thumbnail string into a QImage object
         """
-        if text:
+        if not text:
             raise Exception("thumbnail text is empty")
         logger.debug("Decoding thumbnail from base64")
         text_bytes = text.encode("ascii")
