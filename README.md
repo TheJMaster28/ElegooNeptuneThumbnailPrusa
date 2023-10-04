@@ -40,6 +40,8 @@ Older Printers (Neptune 2 series and X) are now supported with the `--old_printe
 
 I would also believe that this package should also work on older version of PrusaSlicer.
 
+Apple silicone will not work on the release. In order to run, you must run the script through an x86 python or else the dlls wil not work. You can does this by installing the x86 Homebrew and Rosetta 2.
+
 
 ## Arguments
 
