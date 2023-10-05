@@ -30,13 +30,30 @@ If you do not want to run the exe, you can also run the script through Python. C
 
 `"C:\Program Files\Python311\python.exe" "C:\ElegooNeptuneThumbnailPrusa\thumbnail.py";`
 
+If you want to hide the terminal at execution, use `pythonw.exe` instead of python.exe:
+
+`"C:\Program Files\Python311\pythonw.exe" "C:\ElegooNeptuneThumbnailPrusa\thumbnail.py";`
 ## Compatibility
 
+Works with these printers:
+
+- NEPTUNE 3 PRO
+- NEPTUNE 3 PLUS
+- NEPTUNE 3 MAX
+- NEPTUNE 4
+- NEPTUNE 4 PRO
+- NEPTUNE 4 PLUS
+- NEPTUNE 4 MAX
+
+Use the `--old_printer` argument for these printers:
+
+- NEPTUNE 2
+- NEPTUNE 2D
+- NEPTUNE 2S
+- NEPTUNE X
+
+
 Tested with PrusaSlicer 2.6.0 and 2.6.1
-
-Works on 3 Series Printers (Pro, Plus, and Max) 
-
-Older Printers (Neptune 2 series and X) are now supported with the `--old_printer` argument! 
 
 I would also believe that this package should also work on older version of PrusaSlicer.
 
