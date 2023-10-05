@@ -240,7 +240,7 @@ class Neptune_Thumbnail:
         with open(self.slicer_output, "r") as file:
             file_content = file.read()
 
-        file_content_new = new_thumbnail_gcode + file_content
+        file_content_new = new_thumbnail_gcode + file_content.replace(r"PrusaSlicer", "Prusa-Slicer")
 
         with open(self.slicer_output, "w") as file:
             file.write(file_content_new)
