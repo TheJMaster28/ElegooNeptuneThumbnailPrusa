@@ -31,6 +31,10 @@ app = QGuiApplication(sys.argv)
 
 
 class Neptune_Thumbnail:
+    thumbnail = ""
+    time_to_print = ""
+    filament_used = ""
+
     def __init__(self, slicer_output, old_printer=False, img_size="200x200"):
         self.slicer_output = slicer_output
         self.run_old_printer = old_printer
@@ -44,21 +48,7 @@ class Neptune_Thumbnail:
         if self.img_size != "200x200":
             logger.info(f"Not using default img size. Will find a thumbnail with size of {img_size}")
 
-    def find_print_time(self):
-        with open(self.slicer_output, "r") as file:
-            for index, line in enumerate(file):
-                if "; estimated printing time (normal mode) =" in line:
-                    time = line.split("=")
-                    return time[1].strip()
-
-    def find_filament_used(self):
-        with open(self.slicer_output, "r") as file:
-            for index, line in enumerate(file):
-                if "; total filament used [g] =" in line:
-                    used = line.split("=")
-                    return used[1].strip()
-
-    def find_thumbnail(self):
+    def parse_through_gcode_file(self):
         """
         Finds thumbnail encoding generated from PrusaSlicer in the gcode file
         """
@@ -72,12 +62,26 @@ class Neptune_Thumbnail:
                 elif "; thumbnail end" in line and found_thumbnail:
                     if found_thumbnail:
                         logger.debug(f"found thumbnail end at file line: {index}")
-                        return thumbnail_str
+                        self.thumbnail = thumbnail_str
+                        found_thumbnail = False
                 elif found_thumbnail:
                     clean_line = line.replace("; ", "")
                     thumbnail_str += clean_line.strip()
 
-            raise Exception(f"End of file reached. Could not find thumbnail {self.img_size} encoding in provided gcode file: {self.slicer_output}")
+                elif "; estimated printing time (normal mode) =" in line:
+                    time = line.split("=")
+                    self.time_to_print = time[1].strip()
+
+                elif "; total filament used [g] =" in line:
+                    used = line.split("=")
+                    self.filament_used = used[1].strip()
+
+            if not self.thumbnail:
+                raise Exception(f"End of file reached. Could not find thumbnail {self.img_size} encoding in provided gcode file: {self.slicer_output}")
+            if not self.time_to_print:
+                raise Exception(f"End of file reached. Could not find estimated printing time in provided gcode file: {self.slicer_output}")
+            if not self.filament_used:
+                raise Exception(f"End of file reached. Could not find estimated total filament used in provided gcode file: {self.slicer_output}")
 
     def decode(self, text) -> QImage:
         """
@@ -90,25 +94,26 @@ class Neptune_Thumbnail:
         decode_data = base64.b64decode(text_bytes)
         image_stream = BytesIO(decode_data)
         qimage: QImage = QImage.fromData(image_stream.getvalue())
-        self.time_str = self.find_print_time()
-        self.filament_str = self.find_filament_used() + "g"
+        self.time_str = self.time_to_print
+        self.filament_str = self.filament_used + "g"
         # Write to image
         logger.debug("Writing text to image")
         # time
         painter = QPainter()
         painter.begin(qimage)
-        font = QFont("Arial", 20)
+        font = QFont("Arial", int(self.img_y * 0.075))
         painter.setFont(font)
         painter.setPen(QColor(Qt.GlobalColor.white))
         x_point = int(self.img_y * 0.02)
         y_point = int(self.img_y * 0.12)
+        y_point_1 = self.img_y - int(self.img_y * 0.05)
         # time
         painter.drawText(x_point, y_point, self.time_str)
         # filament
-        painter.drawText(x_point, self.img_y - y_point + 26, self.filament_str)
+        painter.drawText(x_point, y_point_1, self.filament_str)
 
         painter.end()
-        # qimage.save(path.join(script_dir, "test.png"))
+        qimage.save(path.join(script_dir, "test.png"))
 
         return qimage
 
@@ -220,8 +225,8 @@ class Neptune_Thumbnail:
         """
         Main runner for executable
         """
-        prusa_thumbnail_str = self.find_thumbnail()
-        prusa_thumbnail_decoded = self.decode(prusa_thumbnail_str)
+        self.parse_through_gcode_file()
+        prusa_thumbnail_decoded = self.decode(self.thumbnail)
         new_thumbnail_gcode = ""
         if self.run_old_printer:
             new_thumbnail_gcode += self.parse_screenshot(prusa_thumbnail_decoded, 200, 200, ";gimage:")
