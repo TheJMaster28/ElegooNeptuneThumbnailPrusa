@@ -113,7 +113,7 @@ class Neptune_Thumbnail:
         painter.drawText(x_point, y_point_1, self.filament_str)
 
         painter.end()
-        qimage.save(path.join(script_dir, "test.png"))
+        # qimage.save(path.join(script_dir, "test.png"))
 
         return qimage
 
