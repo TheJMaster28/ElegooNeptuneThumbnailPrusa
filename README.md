@@ -62,10 +62,12 @@ Apple silicone will not work on the release. In order to run, you must run the s
 
 ## Arguments
 
-| Argument             | Description                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------- |
-| `--old_printer`      | To generate thumbnails for Neptune 2 series printers and older                                          |
-| `--img_size 200x200` | Image size to look for in the Gcode file. This must match to what is in the 'G-code thumbnails' setting |
+| Argument              | Description                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `--old_printer`       | To generate thumbnails for Neptune 2 series printers and older                                          |
+| `--img_size 200x200`  | Image size to look for in the Gcode file. This must match to what is in the 'G-code thumbnails' setting |
+| `--short_time_format` | Change the format of the time on the thumbnail to a shorter format of 00h00m                            |
+| `--debug`             | Enable debugging mode                                                                                   |
 
 To add arguments to the script, make sure to wrap them around double quotes "" to have them phrase properly like this:
 `"C:\ElegooNeptuneThumbnailPrusa\thumbnail.exe" "--img_size" "300x300";`

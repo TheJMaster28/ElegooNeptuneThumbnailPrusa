@@ -95,7 +95,7 @@ class Neptune_Thumbnail:
 
                     if self.short_time_format:
                         hours += days * 24
-                        self.time_to_print = "{}hr{:02d}m".format(hours, minutes)
+                        self.time_to_print = "{}h{:02d}m".format(hours, minutes)
                     elif days != 0:
                         self.time_to_print = "{}d {}h {}m".format(days, hours, minutes)
 
