@@ -10,12 +10,14 @@ import base64
 import logging
 import platform
 import re
+import os
 import sys
 from array import array
 from ctypes import *
-from datetime import timedelta
+from datetime import datetime
 from io import BytesIO
 from os import path
+from shutil import copy
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QGuiApplication, QImage, QPainter
@@ -23,7 +25,7 @@ from PyQt6.QtGui import QColor, QFont, QGuiApplication, QImage, QPainter
 
 script_dir = path.dirname(sys.argv[0])
 log_file = path.join(script_dir, "app.log")
-logging.basicConfig(level=logging.DEBUG, filename=log_file, filemode="w", format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(filename=log_file, filemode="w", format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("my_logger")
 
 
@@ -35,10 +37,12 @@ class Neptune_Thumbnail:
     time_to_print = ""
     filament_used = ""
 
-    def __init__(self, slicer_output, old_printer=False, img_size="200x200"):
+    def __init__(self, slicer_output, old_printer=False, img_size="200x200", short_time_format=False, debug=False):
         self.slicer_output = slicer_output
         self.run_old_printer = old_printer
+        self.short_time_format = short_time_format
         self.img_size = img_size
+        self.debug = debug
         _ = img_size.split("x")
         self.img_x = int(_[0])
         self.img_y = int(_[1])
@@ -56,10 +60,10 @@ class Neptune_Thumbnail:
         found_thumbnail = False
         with open(self.slicer_output, "r") as file:
             for index, line in enumerate(file):
-                if f"; thumbnail begin {self.img_size}" in line:
+                if re.search(f"; thumbnail[_A-Z]* begin {self.img_size}", line):
                     logger.debug(f"found thumbnail begin at file line: {index}")
                     found_thumbnail = True
-                elif "; thumbnail end" in line and found_thumbnail:
+                elif re.search("; thumbnail[_A-Z]* end", line) and found_thumbnail:
                     if found_thumbnail:
                         logger.debug(f"found thumbnail end at file line: {index}")
                         self.thumbnail = thumbnail_str
@@ -71,10 +75,33 @@ class Neptune_Thumbnail:
                 elif "; estimated printing time (normal mode) =" in line:
                     time = line.split("=")
                     self.time_to_print = time[1].strip()
+                    # 00d 00h 00m 00s
+                    days = 0
+                    hours = 0
+                    minutes = 0
+                    seconds = 0
+                    days_match = re.search("([0-9]+)d", self.time_to_print)
+                    if days_match:
+                        days = int(days_match.group(1))
+                    hours_match = re.search("([0-9]+)h", self.time_to_print)
+                    if hours_match:
+                        hours = int(hours_match.group(1))
+                    minutes_match = re.search("([0-9]+)m", self.time_to_print)
+                    if minutes_match:
+                        minutes = int(minutes_match.group(1))
+                    seconds_match = re.search("([0-9]+)m", self.time_to_print)
+                    if seconds_match:
+                        seconds = int(seconds_match.group(1))
+
+                    if self.short_time_format:
+                        hours += days * 24
+                        self.time_to_print = "{}hr{:02d}m".format(hours, minutes)
+                    elif days != 0:
+                        self.time_to_print = "{}d {}h {}m".format(days, hours, minutes)
 
                 elif "; total filament used [g] =" in line:
                     used = line.split("=")
-                    self.filament_used = used[1].strip()
+                    self.filament_used = used[1].strip() + "g"
 
             if not self.thumbnail:
                 raise Exception(f"End of file reached. Could not find thumbnail {self.img_size} encoding in provided gcode file: {self.slicer_output}")
@@ -94,28 +121,29 @@ class Neptune_Thumbnail:
         decode_data = base64.b64decode(text_bytes)
         image_stream = BytesIO(decode_data)
         qimage: QImage = QImage.fromData(image_stream.getvalue())
-        self.time_str = self.time_to_print
-        self.filament_str = self.filament_used + "g"
+        return qimage
+
+    def write_text_image(self, qimage: QImage):
         # Write to image
         logger.debug("Writing text to image")
-        # time
         painter = QPainter()
         painter.begin(qimage)
-        font = QFont("Arial", int(self.img_y * 0.075))
+        size = qimage.height()
+        font = QFont("Arial", int(size * 0.075))
         painter.setFont(font)
         painter.setPen(QColor(Qt.GlobalColor.white))
-        x_point = int(self.img_y * 0.02)
-        y_point = int(self.img_y * 0.12)
-        y_point_1 = self.img_y - int(self.img_y * 0.05)
+        x_point = int(size * 0.02)
+        y_point = int(size * 0.12)
+        y_point_1 = size - int(size * 0.05)
         # time
-        painter.drawText(x_point, y_point, self.time_str)
+        painter.drawText(x_point, y_point, self.time_to_print)
         # filament
-        painter.drawText(x_point, y_point_1, self.filament_str)
-
+        painter.drawText(x_point, y_point_1, self.filament_used)
         painter.end()
-        # qimage.save(path.join(script_dir, "test.png"))
 
-        return qimage
+        if self.debug:
+            logger.debug(f"Writing test image to {script_dir}\\test.png")
+            qimage.save(path.join(script_dir, "test.png"))
 
     def parse_screenshot(self, img: QImage, width, height, img_type) -> str:
         """
@@ -123,6 +151,7 @@ class Neptune_Thumbnail:
         """
         result = ""
         b_image = img.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+        self.write_text_image(b_image)
         img_size = b_image.size()
         result += img_type
         datasize = 0
@@ -173,6 +202,8 @@ class Neptune_Thumbnail:
 
         result = ""
         b_image = img.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+        self.write_text_image(b_image)
+        logger.debug("Encoding thumbnail image")
         img_size = b_image.size()
         color16 = array("H")
         try:
@@ -249,11 +280,13 @@ class Neptune_Thumbnail:
 
         with open(self.slicer_output, "w") as file:
             file.write(file_content_new)
+
         logger.info(f"Wrote new thumbnail screenshot in gcode file: {self.slicer_output}")
 
 
 if __name__ == "__main__":
     try:
+        start_time = datetime.now()
         parser = argparse.ArgumentParser(prog=path.basename(__file__))
         parser.add_argument(
             "input_file",
@@ -272,9 +305,28 @@ if __name__ == "__main__":
             default="200x200",
             help="Size of image to find in Gcode to encode",
         )
+        parser.add_argument(
+            "--short_time_format",
+            default=False,
+            action="store_true",
+            help="display a shorter time format on thumbnails",
+        )
+        parser.add_argument(
+            "--debug",
+            default=False,
+            action="store_true",
+        )
 
         args = parser.parse_args()
-        obj = Neptune_Thumbnail(args.input_file, old_printer=args.old_printer, img_size=args.img_size)
+
+        if args.debug:
+            logger.setLevel(logging.DEBUG)
+        else:
+            logger.setLevel(logging.INFO)
+
+        obj = Neptune_Thumbnail(args.input_file, old_printer=args.old_printer, img_size=args.img_size, short_time_format=args.short_time_format, debug=args.debug)
         obj.run()
+        end_time = datetime.now()
+        logger.debug(f"Execution Time: {end_time - start_time}")
     except Exception as ex:
         logger.exception("Error occurred while running application.")
