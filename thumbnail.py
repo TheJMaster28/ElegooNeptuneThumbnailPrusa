@@ -98,6 +98,8 @@ class Neptune_Thumbnail:
                         self.time_to_print = "{}h{:02d}m".format(hours, minutes)
                     elif days != 0:
                         self.time_to_print = "{}d {}h {}m".format(days, hours, minutes)
+                    else:
+                        self.time_to_print = "{}h {}m".format(hours, minutes)
 
                 elif "; total filament used [g] =" in line:
                     used = line.split("=")
@@ -260,8 +262,8 @@ class Neptune_Thumbnail:
         prusa_thumbnail_decoded = self.decode(self.thumbnail)
         new_thumbnail_gcode = ""
         if self.run_old_printer:
+            new_thumbnail_gcode += self.parse_screenshot(prusa_thumbnail_decoded, 100, 100, ";simage:")
             new_thumbnail_gcode += self.parse_screenshot(prusa_thumbnail_decoded, 200, 200, ";gimage:")
-            new_thumbnail_gcode += self.parse_screenshot(prusa_thumbnail_decoded, 160, 160, ";simage:")
         else:
             new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 200, 200, ";gimage:")
             new_thumbnail_gcode += self.parse_screenshot_new(prusa_thumbnail_decoded, 160, 160, ";simage:")
